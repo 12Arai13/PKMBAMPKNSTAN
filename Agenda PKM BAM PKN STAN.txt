@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Kalender PKM BAM PKN STAN</title>
+<style>
+*{box-sizing:border-box;}
+body{
+  font-family:"Segoe UI",sans-serif;
+  background:#fafafa;
+  padding:20px;
+  margin:0;
+}
+
+/* HEADER */
+.header{
+  background:linear-gradient(135deg,#fc8092,#ebe8ce);
+  color:white;
+  padding:22px;
+  border-radius:16px;
+  text-align:center;
+  margin-bottom:18px;
+}
+.header h1{margin:0;font-size:28px;}
+.header p{margin-top:6px;font-size:16px;opacity:.9;}
+
+/* FLEX CONTAINER KALENDER + AGENDA */
+.grid{
+  display:flex;
+  gap:20px;
+  flex-wrap:nowrap; /* jangan wrap */
+  align-items:stretch; /* paksa tinggi sama */
+}
+
+/* FLEX ITEM */
+.grid > div{
+  flex:1;
+  min-width:0; /* penting supaya flex shrink benar */
+}
+
+/* CALENDAR */
+.calendar{
+  background:white;
+  border-radius:14px;
+  box-shadow:0 6px 20px rgba(0,0,0,.08);
+  display:flex;
+  flex-direction:column;
+}
+.weekdays,.days{
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  padding:10px;
+}
+.weekdays div{text-align:center;font-weight:600;color:#666;}
+.days div{
+  text-align:center;
+  padding:12px 0;
+  border-radius:10px;
+  color:#555;
+  position:relative;
+}
+.days div.today{
+  background:#ebe8ce;
+  font-weight:bold;
+}
+.days div.has-event::after{
+  content:"";
+  width:8px;height:8px;
+  background:#fc8092;
+  border-radius:50%;
+  position:absolute;
+  bottom:6px;left:50%;
+  transform:translateX(-50%);
+}
+
+/* PANEL AGENDA */
+.panel{
+  background:white;
+  border-radius:14px;
+  box-shadow:0 6px 20px rgba(0,0,0,.08);
+  padding:16px;
+  overflow-y:auto;
+}
+.panel h3{
+  margin:0 0 12px;
+  font-size:20px;
+}
+
+/* AGENDA ITEM */
+.agenda-item{
+  padding:12px 16px;
+  border-radius:10px;
+  margin-bottom:10px;
+  font-size:16px;
+  cursor:pointer;
+  transition:0.2s;
+}
+.agenda-item:hover{
+  background:#fc8092;
+  color:white;
+}
+.pink{background:#fc8092;color:white;}
+.cream{background:#ebe8ce;}
+
+/* COUNTDOWN PANEL */
+.countdown-panel{
+  background:white;
+  border-radius:14px;
+  box-shadow:0 6px 20px rgba(0,0,0,.08);
+  padding:16px;
+  margin-top:16px;
+}
+.count-item{
+  padding:12px 16px;
+  border-radius:10px;
+  margin-bottom:10px;
+  background:#f9f9f9;
+  font-size:16px;
+}
+.cd-day{color:#fc8092;font-weight:bold;}
+.cd-time{color:#c5bfa3;}
+
+/* RESPONSIVE */
+@media(max-width:900px){
+  .grid{flex-direction:column;}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🦋 AGENDA KESEHATAN MENTAL 🦋 </h1>
+  <p>PKM BAM PKN STAN</p>
+</div>
+
+<div class="grid">
+  <!-- KALENDER -->
+  <div class="calendar">
+    <div class="weekdays">
+      <div>Sen</div><div>Sel</div><div>Rab</div>
+      <div>Kam</div><div>Jum</div><div>Sab</div><div>Min</div>
+    </div>
+    <div class="days" id="days"></div>
+  </div>
+
+  <!-- AGENDA MENDATANG -->
+  <div class="panel">
+    <h3>📌 Agenda Mendatang</h3>
+    <div id="upcoming"></div>
+  </div>
+</div>
+
+<div class="countdown-panel">
+  <h3>⏳ Countdown Agenda</h3>
+  <div id="countdown"></div>
+</div>
+
+<script>
+const API_KEY="AIzaSyAwcSEKrB7OFVeEyfS5zNYzhNeUSnnlT9g";
+const CALENDAR_ID="pkmbampknstan@gmail.com";
+
+const daysEl=document.getElementById("days");
+const upcomingEl=document.getElementById("upcoming");
+const countdownEl=document.getElementById("countdown");
+
+const today=new Date();
+const limitDate=new Date("2026-11-30T23:59:59");
+let allEvents=[];
+
+fetch(`https://www.googleapis.com/calendar/v3/calendars/${CALENDAR_ID}/events?key=${API_KEY}&singleEvents=true&orderBy=startTime`)
+.then(r=>r.json())
+.then(d=>{
+  allEvents=d.items
+    .filter(e=>e.status!=="cancelled")
+    .map(e=>({
+      title:e.summary,
+      date:new Date(e.start.dateTime||e.start.date)
+    }))
+    .sort((a,b)=>a.date-b.date);
+
+  renderCalendar();
+  renderUpcoming();
+  renderCountdown();
+});
+
+/* CALENDAR */
+function renderCalendar(){
+  const y=today.getFullYear(), m=today.getMonth();
+  const first=(new Date(y,m,1).getDay()||7)-1;
+  const total=new Date(y,m+1,0).getDate();
+
+  for(let i=0;i<first;i++) daysEl.appendChild(document.createElement("div"));
+
+  for(let d=1; d<=total; d++){
+    const date=new Date(y,m,d);
+    const el=document.createElement("div");
+    el.textContent=d;
+
+    if(date.toDateString()===today.toDateString()) el.classList.add("today");
+    if(allEvents.some(e=>e.date.toDateString()===date.toDateString())) el.classList.add("has-event");
+
+    daysEl.appendChild(el);
+  }
+}
+
+/* AGENDA 5 TERDEKAT */
+function renderUpcoming(){
+  const upcoming=allEvents.filter(e=>e.date>today && e.date<=limitDate).slice(0,5);
+  upcomingEl.innerHTML="";
+  upcoming.forEach((e,i)=>{
+    const div=document.createElement("div");
+    div.className=`agenda-item ${i%2===0?"pink":"cream"}`;
+    div.textContent=`${e.date.toLocaleDateString("id-ID")} — ${e.title}`;
+    upcomingEl.appendChild(div);
+  });
+}
+
+/* COUNTDOWN 3 TERDEKAT */
+function renderCountdown(){
+  const next=allEvents.filter(e=>e.date>today).slice(0,3);
+  countdownEl.innerHTML="";
+  next.forEach(e=>{
+    const diff=e.date-today;
+    const days=Math.floor(diff/86400000);
+    const hours=Math.floor(diff/3600000)%24;
+
+    const div=document.createElement("div");
+    div.className="count-item";
+    div.innerHTML=`
+      <strong>${e.title}</strong><br>
+      <span class="cd-day">${days} hari</span>
+      <span class="cd-time">${hours} jam lagi</span>
+    `;
+    countdownEl.appendChild(div);
+  });
+}
+</script>
+
+</body>
+</html>
